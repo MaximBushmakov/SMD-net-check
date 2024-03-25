@@ -111,7 +111,12 @@ void rollback(vector<Node>& net, vector<NodeChoice>& stack_left, vector<NodeChoi
 
     // put this branch back to stack_left (blocks of the original place are preserved)
     if (change_branch) {
-        set<int> next_places = net[stack_right.back().transition].next;
+        set<int> next_places;
+        if (net[stack_right.back().place].next.count(stack_right.back().transition)) {
+            next_places = net[stack_right.back().transition].next;
+        } else {
+            next_places = net[stack_right.back().transition].prev;
+        }
         stack_left.push_back(NodeChoice{stack_right.back().place, stack_right.back().transition, vector<int> (next_places.begin(), next_places.end())});
     }
 
