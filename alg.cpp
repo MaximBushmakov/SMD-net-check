@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <set>
 
 #define fori(n) for (int i = 0; i < n; ++i)
 
@@ -12,10 +13,10 @@ using namespace std;
 struct Node {
     int val;
     bool is_place;
-    vector<int> prev;
-    vector<int> next;
+    set<int> prev;
+    set<int> next;
 
-    explicit Node(int val, bool is_place, vector<int> prev, vector<int> next) {
+    explicit Node(int val, bool is_place, set<int> prev, set<int> next) {
         this->val = val;
         this->is_place = is_place;
         this->prev = prev;
@@ -110,7 +111,8 @@ void rollback(vector<Node>& net, vector<NodeChoice>& stack_left, vector<NodeChoi
 
     // put this branch back to stack_left (blocks of the original place are preserved)
     if (change_branch) {
-        stack_left.push_back(NodeChoice{stack_right.back().place, stack_right.back().transition, net[stack_right.back().transition].next});
+        set<int> next_places = net[stack_right.back().transition].next;
+        stack_left.push_back(NodeChoice{stack_right.back().place, stack_right.back().transition, vector<int> (next_places.begin(), next_places.end())});
     }
 
     // rollback
@@ -134,12 +136,136 @@ void rollback(vector<Node>& net, vector<NodeChoice>& stack_left, vector<NodeChoi
     } while (!cur_places.empty() && block[cur_places.back()] > 0);
 }
 
+
+// return 
+//      index of first place that does not belong to any sequential component
+//      -1 if it's SMD
+//      -2 if it isn't Petri nets (isn't bipartite graph)
 int alg(int net_size, vector<Node>& net) {
 
-    // check correctness
-    // simplify
+    bool is_correct = true;
+    fori (net_size) {
+        for (int next: net[i].next) {
+            if (!(net[next].is_place ^ net[i].is_place)) {
+                is_correct = false;
+                break;
+            }
+        }
+        if (!is_correct) {
+            break;
+        }
+    }
+    if (!is_correct) {
+        return -2;
+    }
 
     vector<bool> vis (net_size, false);
+    vector<int> simplified (net_size, false);
+
+    vector<int> stack;
+    bool success = true;
+    for (int node = 0; node < net_size; ++node) {
+        stack.push_back(node);
+        while (!stack.empty()) {
+            int cur_node = stack.back();
+
+            if (simplified[cur_node] == 2) {
+                stack.pop_back();
+                continue;
+            }
+            if (simplified[cur_node] == 0) {
+                simplified[cur_node] = 1;
+                for (int next: net[cur_node].next) {
+                    if (!simplified[next]) {
+                        stack.push_back(next);
+                    }
+                }
+                continue;
+            }
+
+            if (net[cur_node].is_place) {
+                
+                // first modification
+                int next_node = -1;
+                set<int> next_nodes =  net[cur_node].next;
+                for (int next: next_nodes) {
+                    if (net[next].next.size() == 1 && net[next].prev.size() == 1) {
+                        next_node = *(net[next].next.begin());
+
+                        int cur_next_size = net[cur_node].next.size();
+                        int cur_prev_size = net[cur_node].prev.size();
+                        net[cur_node].next.insert(net[next_node].next.begin(), net[next_node].next.end());
+                        net[cur_node].prev.insert(net[next_node].prev.begin(), net[next_node].prev.end());
+
+                        for (int next_transition : net[next_node].next) {
+                            net[next_transition].prev.erase(next_node);
+                            net[next_transition].prev.emplace(cur_node);
+                        }
+                        for (int prev_transition: net[next_node].prev) {
+                            net[prev_transition].next.erase(next_node);
+                            net[prev_transition].next.emplace(cur_node);
+                        }
+
+                        // means we got common neighbour
+                        if (net[cur_node].next.size() < cur_next_size + net[next_node].next.size() ||
+                            net[cur_node].prev.size() < cur_prev_size + net[next_node].prev.size()) {
+                            success = false;
+                            break;
+                        }
+
+                        vis[next_node] = true;
+                        simplified[next_node] = 2;
+
+                        // delete self-loops
+                        vector<int> common;
+                        set_intersection(net[cur_node].prev.begin(), net[cur_node].prev.end(),
+                            net[cur_node].next.begin(), net[cur_node].next.end(), back_inserter(common));
+                        for (int transition : common) {
+                            net[cur_node].next.erase(transition);
+                            net[cur_node].prev.erase(transition);
+                            net[transition].next.erase(cur_node);
+                            net[transition].prev.erase(cur_node);
+                            if (net[transition].next.empty() ^ net[transition].prev.empty()) {
+                                success = false;
+                                break;
+                            }
+                        }
+
+                        if (!success) {
+                            break;
+                        }
+                    }
+                }
+
+                if (!success) {
+                    break;
+                }
+                
+
+                // delete self-loops
+                vector<int> common;
+                set_intersection(net[cur_node].prev.begin(), net[cur_node].prev.end(),
+                    net[cur_node].next.begin(), net[cur_node].next.end(), back_inserter(common));
+                for (int transition : common) {
+                    net[cur_node].next.erase(transition);
+                    net[cur_node].prev.erase(transition);
+                    net[transition].next.erase(cur_node);
+                    net[transition].prev.erase(cur_node);
+                    if (net[transition].next.empty() ^ net[transition].prev.empty()) {
+                        success = false;
+                        break;
+                    }
+                }
+            }
+            simplified[cur_node] = 2;
+        }
+
+        if (!success) {
+            return node;
+        }
+    }
+    
+
     for (int start_place = 0; start_place < net_size; ++start_place) {
         if (!net[start_place].is_place || vis[start_place]) {
             continue;
@@ -193,7 +319,8 @@ int alg(int net_size, vector<Node>& net) {
                 cur_places = stack_right.back().next_places;
 
                 // block current place if needed and add next places
-                if (net[stack_right.back().place].next.back() == stack_right.back().transition) {
+                if (!net[stack_right.back().place].next.empty() && *(--net[stack_right.back().place].next.end()) == stack_right.back().transition ||
+                    !net[stack_right.back().place].prev.empty() && *(--net[stack_right.back().place].prev.end()) == stack_right.back().transition) {
                     add_blocks(net, cur_places.back(), block);
                 }
                 res = add_neighbourhood(net, block, component, cur_places.back(), stack_left);
@@ -209,45 +336,22 @@ int alg(int net_size, vector<Node>& net) {
 
         // add right stack to vis
         while (!stack_right.empty()) {
-            vis[stack_right.back().next_places.back()] = true;
+            int cur_place = stack_right.back().next_places.back();
             stack_right.pop_back();
+            vis[cur_place] = true;
+            // delete paths to this place
+            for (int next: net[cur_place].next) {
+                net[next].prev.erase(cur_place);
+                net[cur_place].next.erase(next);
+            }
+            for (int prev: net[cur_place].prev) {
+                net[prev].next.erase(cur_place);
+                net[cur_place].prev.erase(prev);
+            }
+
         }
         vis[start_place] = true;
     }
 
     return -1;
 }
-
-
-// int main() {
-//     string line;
-//     getline(cin, line);
-//     int net_size = stoi(line);
-//     vector<Node> net (net_size);
-//     fori(net_size) {
-//         net[i] = Node{i, true, {}, {}};
-//     }
-
-//     istringstream line_stream;
-//     fori(net_size) {
-//         getline(cin, line);
-//         line_stream = istringstream(line);
-        
-//         int j;
-//         line_stream >> j;
-//         net[i].is_place = j;
-//         while (line_stream >> j) {
-//             net[i].next.push_back(j);
-//             net[j].prev.push_back(i);
-//         }
-//     }
-
-//     int  ans = alg(net_size, net);
-
-//     if (ans == -1) {
-//         cout << "It's SMD" << endl;
-//     } else {
-//         cout << "Place " << ans << " is not a part of any component" << endl;
-//     }
-    
-// }
