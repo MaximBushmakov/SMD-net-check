@@ -340,13 +340,19 @@ int alg(int net_size, vector<Node>& net) {
             stack_right.pop_back();
             vis[cur_place] = true;
             // delete paths to this place
-            for (int next: net[cur_place].next) {
-                net[next].prev.erase(cur_place);
-                net[cur_place].next.erase(next);
+            set<int> next_transitions = net[cur_place].next;
+            for (int next: next_transitions) {
+                if (net[next].prev.size() > 1) {
+                    net[next].prev.erase(cur_place);
+                    net[cur_place].next.erase(next);
+                }
             }
-            for (int prev: net[cur_place].prev) {
-                net[prev].next.erase(cur_place);
-                net[cur_place].prev.erase(prev);
+            set<int> prev_transitions = net[cur_place].prev;
+            for (int prev: prev_transitions) {
+                if (net[prev].next.size() > 1) {
+                    net[prev].next.erase(cur_place);
+                    net[cur_place].prev.erase(prev);
+                }
             }
 
         }

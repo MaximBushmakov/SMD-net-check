@@ -5,7 +5,7 @@
 
 using namespace std;
 
-const int test_num = 7;
+const int test_num = 11;
 int main() {
     ifstream file;
     for (int test_i = 0; test_i < test_num; ++test_i) {
