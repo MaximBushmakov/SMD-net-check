@@ -136,6 +136,22 @@ void rollback(vector<Node>& net, vector<NodeChoice>& stack_left, vector<NodeChoi
     } while (!cur_places.empty() && block[cur_places.back()] > 0);
 }
 
+bool delete_self_loops(vector<Node>& net, int node) {
+    vector<int> common;
+    set_intersection(net[node].prev.begin(), net[node].prev.end(),
+        net[node].next.begin(), net[node].next.end(), back_inserter(common));
+    for (int transition : common) {
+        net[node].next.erase(transition);
+        net[node].prev.erase(transition);
+        net[transition].next.erase(node);
+        net[transition].prev.erase(node);
+        if (net[transition].next.empty() ^ net[transition].prev.empty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 
 // return 
 //      index of first place that does not belong to any sequential component
@@ -216,20 +232,7 @@ int alg(int net_size, vector<Node>& net) {
                         vis[next_node] = true;
                         simplified[next_node] = 2;
 
-                        // delete self-loops
-                        vector<int> common;
-                        set_intersection(net[cur_node].prev.begin(), net[cur_node].prev.end(),
-                            net[cur_node].next.begin(), net[cur_node].next.end(), back_inserter(common));
-                        for (int transition : common) {
-                            net[cur_node].next.erase(transition);
-                            net[cur_node].prev.erase(transition);
-                            net[transition].next.erase(cur_node);
-                            net[transition].prev.erase(cur_node);
-                            if (net[transition].next.empty() ^ net[transition].prev.empty()) {
-                                success = false;
-                                break;
-                            }
-                        }
+                        success = delete_self_loops(net, cur_node);
 
                         if (!success) {
                             break;
@@ -241,20 +244,10 @@ int alg(int net_size, vector<Node>& net) {
                     break;
                 }
                 
+                success = delete_self_loops(net, cur_node);
 
-                // delete self-loops
-                vector<int> common;
-                set_intersection(net[cur_node].prev.begin(), net[cur_node].prev.end(),
-                    net[cur_node].next.begin(), net[cur_node].next.end(), back_inserter(common));
-                for (int transition : common) {
-                    net[cur_node].next.erase(transition);
-                    net[cur_node].prev.erase(transition);
-                    net[transition].next.erase(cur_node);
-                    net[transition].prev.erase(cur_node);
-                    if (net[transition].next.empty() ^ net[transition].prev.empty()) {
-                        success = false;
-                        break;
-                    }
+                if (!success) {
+                    break;
                 }
             }
             simplified[cur_node] = 2;
