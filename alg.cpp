@@ -338,36 +338,38 @@ int alg(int net_size, vector<Node>& net) {
             stack_right.pop_back();
             vis[cur_place] = true;
 
-            // delete paths to this place
-            set<int> next_transitions = net[cur_place].next;
-            set<int> prev_transitions = net[cur_place].prev;
-            bool can_delete = true;
-            for (int next: next_transitions) {
-                if (net[next].prev.size() == 1) {
-                    can_delete = false;
-                    break;
-                }
-            }
-            if (!can_delete) {
-                continue;
-            }
-            for (int prev: prev_transitions) {
-                if (net[prev].next.size() == 1) {
-                    can_delete = false;
-                }
-            }
-            if (!can_delete) {
-                continue;
-            }
+            // deletion is incorrect in current form
             
-            for (int next: next_transitions) {
-                net[next].prev.erase(cur_place);
-                net[cur_place].next.erase(next);
-            }
-            for (int prev: prev_transitions) {
-                net[prev].next.erase(cur_place);
-                net[cur_place].prev.erase(prev);
-            }
+            // // delete paths to this place
+            // set<int> next_transitions = net[cur_place].next;
+            // set<int> prev_transitions = net[cur_place].prev;
+            // bool can_delete = true;
+            // for (int next: next_transitions) {
+            //     if (net[next].prev.size() == 1) {
+            //         can_delete = false;
+            //         break;
+            //     }
+            // }
+            // if (!can_delete) {
+            //     continue;
+            // }
+            // for (int prev: prev_transitions) {
+            //     if (net[prev].next.size() == 1) {
+            //         can_delete = false;
+            //     }
+            // }
+            // if (!can_delete) {
+            //     continue;
+            // }
+            
+            // for (int next: next_transitions) {
+            //     net[next].prev.erase(cur_place);
+            //     net[cur_place].next.erase(next);
+            // }
+            // for (int prev: prev_transitions) {
+            //     net[prev].next.erase(cur_place);
+            //     net[cur_place].prev.erase(prev);
+            // }
 
         }
         vis[start_place] = true;
