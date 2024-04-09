@@ -1,18 +1,31 @@
-#include <iostream>
+#include "alg_base.cpp"
+#include "alg_base_del.cpp"
+#include "alg_optimized.cpp"
+#include "alg_optimized_del.cpp"
+
 #include <fstream>
 
-#include "alg.cpp"
-
 using namespace std;
+using std::cout;
 
-const int test_num = 11;
+using alg_optimized_del::Node;
+
+int test_num = 14;
+int test_begin = 10;
+int test_end = 15;
+
 int main() {
     ifstream file;
-    for (int test_i = 0; test_i < test_num; ++test_i) {
-        file.open("./tests/" + to_string(test_i), std::ios::in);
+    if (test_num != -1) {
+        test_begin = test_num;
+        test_end = test_num + 1;
+    }
+    for (int test_i = test_begin; test_i < test_end; ++test_i) {
+        file.open("./tests/bad_cycles/" + to_string(test_i), std::ios::in);
         
         string line;
         getline(file, line);
+        cout << line << endl;
         int net_size = stoi(line);
         vector<Node> net (net_size);
         fori(net_size) {
@@ -34,6 +47,7 @@ int main() {
         }
 
         getline(file, line);
+        cout << line << endl;
         int ans_correct = stoi(line);
 
         file.close();
