@@ -757,7 +757,7 @@ int main() {
     unordered_set<Net*> nets_sym;
     nets_sym.insert(net);
 
-    forx(cur_size, 0, max_size) {
+    forx(cur_size, 0, max_size - 1) {
         vector<Net*> nets_prev = nets;
         nets.clear();
 
@@ -847,6 +847,82 @@ int main() {
         // }
         nets_del.clear();
     }
+
+    // last cycle
+
+    vector<Net*> nets_prev = nets;
+    nets.clear();
+
+    int nets_num = 0;
+
+    for (Net* net_prev: nets_prev) {
+        Net* net_cur = new Net(net_prev);
+
+        // add one transition to every net
+        int places_num = net_cur->places_num();
+        // each transition has number from 0 to 3^k - 1 including
+        // which defines -1/0/1 for each of k places 
+        int t_max = 1;
+        fori(places_num) {
+            t_max *= 3;
+        }
+        forx(t, 0, t_max) {
+            vector<int> arcs (places_num);
+            int t_cur = t;
+            fori(places_num) {
+                arcs[i] = t_cur % 3 - 1;
+                t_cur /= 3;
+            }
+            int add_success = net_cur->add_transition(arcs);
+            if (add_success) {
+                if (net_cur->check_connectivity() && !net_cur->check_transformations() &&
+                    nets_sym.find(net_cur) == nets_sym.end()) {
+                        
+                    nets.push_back(net_cur);
+                    output << graph_to_string(net_cur) << std::endl;
+                    nets_num += 1;
+
+                    // add all automorphisms to nets
+                    // to ensure that all net are unique up to gomomorphisms
+                    vector<int>
+                        places = net_cur->places_list(),
+                        transitions = net_cur->transitions_list();
+                    vector<int> indices (net_cur->get_size());
+
+                    // loops are in form of do while
+                    bool transition_permutation = true;
+                    while (transition_permutation) {
+                        bool place_permutation = true;
+                        while (place_permutation) {
+                            int places_ind = 0,
+                                transitions_ind = 0;
+                            fori(net_cur->get_size()) {
+                                if (net_cur->is_place(i)) {
+                                    indices[i] = places[places_ind++];
+                                } else {
+                                    indices[i] = transitions[transitions_ind++];
+                                }
+                            }
+                            Net* net_next = new Net(net_cur);
+                            net_next->renumerate(indices);
+                            nets_sym.insert(net_next);
+
+                            place_permutation = next_permutation(places.begin(), places.end());
+                        }
+                        transition_permutation = next_permutation(transitions.begin(), transitions.end());
+                    }
+                }
+                net_cur = new Net(net_prev);
+            }
+        }
+    }
+
+    cout << nets_num << " " << nets.size() << " " << nets_sym.size() << endl << endl;
+
+    for (Net* net: nets_prev) {
+        delete net;
+    }
+    nets_prev.clear();
 
     for (Net* net: nets) {
         delete net;
