@@ -32,7 +32,6 @@ using namespace std;
 class Net {
 
     private:
-    public:
         // graph as matrix
         // graph[i][j] = 1 if there is an arc from i to j
         // as far as net is SMD EN:
@@ -49,7 +48,7 @@ class Net {
         vector<bool> places;
 
         // for each vertex if it is place it contains copies of all seq components from cover
-        vector<vector<vector<int>>> cover;
+        vector<set<vector<int>>> cover;
 
         int smd_dif;
     
@@ -69,6 +68,13 @@ class Net {
     }
 
     public:
+
+    Net () {
+        size = 0;
+        places = {};
+        graph = {{}};
+        cover = {};
+    }
 
     // base constructor
     // create empty net, fix maximum size
@@ -189,7 +195,7 @@ class Net {
         return res;
     }
 
-    vector<vector<vector<int>>> get_cover() const {
+    vector<set<vector<int>>> get_cover() const {
         return cover;
     }
 
@@ -224,11 +230,19 @@ class Net {
         if (change_all) {
 
             // change cover
+            vector<set<vector<int>>> cover_prev (size);
             fori (size) {
-                forx(v, 0, cover[i].size()) {
-                    forx(p, 0, cover[i][v].size()) {
-                        cover[i][v][p] = indices[cover[i][v][p]];
+                for (vector<int> cov: cover[i]) {
+                    cover_prev[i].insert(cov);
+                }
+            }
+            fori (size) {
+                cover.clear();
+                for (vector<int> cov: cover_prev[i]) {
+                    forx(p, 0, cov.size()) {
+                        cov[p] = indices[cov[p]];
                     }
+                    cover[i].insert(cov);
                 }
             }
         } else {
@@ -419,11 +433,10 @@ class Net {
     //      success flag
     //      on success change cover to fit new net
     bool check_smd() {
-        vector<vector<vector<int>>> cover_prev (size);
+        vector<set<vector<int>>> cover_prev (size);
         forx (i, 0, size) {
-            cover_prev[i].resize(cover[i].size());
-            forx (v, 0, cover[i].size()) {
-                cover_prev[i][v] = cover[i][v];   
+            for (vector<int> cov: cover[i]) {
+                cover_prev[i].insert(cov);   
             }
         }
 
@@ -431,21 +444,41 @@ class Net {
 
         vector<bool> vis (size, true);
         fori(size - 1) {
-            if (cover[i].empty()) {
+            if (!places[i]) {
+                continue;
+            }
+            if (cover_prev[i].empty()) {
                 ++smd_dif_cur;
-            } else if ((graph[size - 1][i] || graph[i][size - 1])) {
+            } else {
+                vector<vector<int>> del_list;
                 for (vector<int> cov: cover[i]) {
+                    bool to_del = false;
                     for (int place: cov) {
-                        vis[place] = false;
+                        if (graph[size - 1][place] || graph[place][size - 1]) {
+                            to_del = true;
+                            break;
+                        }
                     }
+                    if (to_del) {
+                        for (int place: cov) {
+                            del_list.push_back(cov);
+                        }
+                    }
+                }
+
+                for (vector<int> cov: del_list) {
+                    for (int v: cov) {
+                        cover[v].erase(cov);
+                    }
+                }
+                
+                if (cover[i].empty()) {
+                    vis[i] = false;
                 }
             }
         }
-        fori(size - 1) {
-            if (!vis[i]) {
-                cover[i].clear();
-            }
-        }
+
+        cover[size - 1] = {{}};
 
         forx (start_place, 0, size) {
             if (!places[start_place] || vis[start_place]) {
@@ -456,18 +489,15 @@ class Net {
                 ++smd_dif_cur;
                 if (smd_dif_cur > smd_dif) {
                     fori (size) {
-                        cover[i].resize(cover_prev[i].size());
-                        forx (v, 0, cover[i].size()) {
-                            cover[i][v] = cover_prev[i][v];
-                        }
+                        cover[i] = set<vector<int>> (cover_prev[i]);
                     }
                     return false;
                 }
             }
+
             for (int place : res.second) {
                 vis[place] = true;
-                cover[place].push_back({});
-                cover[place][cover[place].size() - 1] = res.second;
+                cover[place].insert(res.second);
             }
         }
 
