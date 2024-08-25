@@ -250,6 +250,19 @@ class Net {
         }
     }
 
+    // reverse all arcs in net
+    void transpose() {
+        vector<vector<int>> graph_prev (size);
+        fori(size) {
+            graph_prev[i] = graph[i];
+        }
+        forx (r, 0, size) {
+            forx(c, 0, size) {
+                graph[r][c] = graph_prev[c][r];
+            }
+        }
+    }
+
     // methods used in add_transition
     private:
 
@@ -447,34 +460,31 @@ class Net {
             if (!places[i]) {
                 continue;
             }
-            if (cover_prev[i].empty()) {
-                ++smd_dif_cur;
-            } else {
-                vector<vector<int>> del_list;
-                for (vector<int> cov: cover[i]) {
-                    bool to_del = false;
-                    for (int place: cov) {
-                        if (graph[size - 1][place] || graph[place][size - 1]) {
-                            to_del = true;
-                            break;
-                        }
-                    }
-                    if (to_del) {
-                        for (int place: cov) {
-                            del_list.push_back(cov);
-                        }
-                    }
-                }
 
-                for (vector<int> cov: del_list) {
-                    for (int v: cov) {
-                        cover[v].erase(cov);
+            vector<vector<int>> del_list;
+            for (vector<int> cov: cover[i]) {
+                bool to_del = false;
+                for (int place: cov) {
+                    if (graph[size - 1][place] || graph[place][size - 1]) {
+                        to_del = true;
+                        break;
                     }
                 }
-                
-                if (cover[i].empty()) {
-                    vis[i] = false;
+                if (to_del) {
+                    for (int place: cov) {
+                        del_list.push_back(cov);
+                    }
                 }
+            }
+
+            for (vector<int> cov: del_list) {
+                for (int v: cov) {
+                    cover[v].erase(cov);
+                }
+            }
+
+            if (cover[i].empty()) {
+                vis[i] = false;
             }
         }
 
@@ -778,6 +788,8 @@ int main() {
 
     fstream output (output_filename);
 
+    auto start_time = chrono::steady_clock::now();
+
     // only left-most variants
     vector<Net*> nets;
     Net* net = new Net(max_size, smd_dif);
@@ -787,7 +799,8 @@ int main() {
     unordered_set<Net*> nets_sym;
     nets_sym.insert(net);
 
-    forx(cur_size, 0, max_size - 1) {
+    forx(cur_size, 1, max_size) {
+
         vector<Net*> nets_prev = nets;
         nets.clear();
 
@@ -828,7 +841,7 @@ int main() {
                         }
 
                         // add all automorphisms to nets
-                        // to ensure that all net are unique up to gomomorphisms
+                        // to ensure that all net are unique up to isomorphisms
                         vector<int>
                             places = net_cur->places_list(),
                             transitions = net_cur->transitions_list();
@@ -848,9 +861,14 @@ int main() {
                                         indices[i] = transitions[transitions_ind++];
                                     }
                                 }
+
                                 Net* net_next = new Net(net_cur);
                                 net_next->renumerate(indices);
                                 nets_sym.insert(net_next);
+                                
+                                Net* net_next_t = new Net(net_next);
+                                net_next_t->transpose();
+                                nets_sym.insert(net_next_t);
 
                                 place_permutation = next_permutation(places.begin(), places.end());
                             }
@@ -913,7 +931,7 @@ int main() {
                     nets_num += 1;
 
                     // add all automorphisms to nets
-                    // to ensure that all net are unique up to gomomorphisms
+                    // to ensure that all net are unique up to isomorphisms
                     vector<int>
                         places = net_cur->places_list(),
                         transitions = net_cur->transitions_list();
@@ -937,6 +955,10 @@ int main() {
                             net_next->renumerate(indices);
                             nets_sym.insert(net_next);
 
+                            Net* net_next_t = new Net(net_next);
+                            net_next_t->transpose();
+                            nets_sym.insert(net_next_t);
+
                             place_permutation = next_permutation(places.begin(), places.end());
                         }
                         transition_permutation = next_permutation(transitions.begin(), transitions.end());
@@ -948,6 +970,10 @@ int main() {
     }
 
     cout << nets_num << " " << nets.size() << " " << nets_sym.size() << endl << endl;
+
+    auto end_time = chrono::steady_clock::now();
+
+    cout << (float)(chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start_time)).count() << endl;
 
     for (Net* net: nets_prev) {
         delete net;
